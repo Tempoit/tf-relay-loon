@@ -1,0 +1,6 @@
+#!name=TestFlight Relay（Loon 补丁版）
+#!desc=TestFlight 中转：Request 脚本中转、多账号索引合并和详情缓存。脚本已按 Loon 适配（转发改由脚本代发、$request 判定修正）。
+
+[Script]
+request if ${url} ~= /^http:\/\/tf-relay\.test(?::8799)?\//i then script("https://raw.githubusercontent.com/Tempoit/tf-relay-loon/main/TestFlight-Relay.js") with tag="TF-Relay", timeout=60, requires_body=true
+cron "0 */5 * * *" then script("https://raw.githubusercontent.com/Tempoit/tf-relay-loon/main/TestFlight-Relay.js") with tag="TF-Relay-Refresh", timeout=300
