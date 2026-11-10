@@ -105,3 +105,55 @@ Loon 没有 `$task`，原逻辑会把改写后的请求（`http://tf-relay.test/
 ## 免责声明
 
 仅供个人学习与自用。使用中转/多账号方案可能违反 Apple 的服务条款，由此产生的账号风险由使用者自行承担。请勿在仓库或 issue 中粘贴 Cookie、AMD、kbSync、密码等任何凭据。
+
+## 许可
+
+- 本仓库的**适配部分**（两处 `[Loon 补丁]`、`.plugin`、README、LICENSE）采用 **MIT**，见 [LICENSE](LICENSE)。
+- `TestFlight-Relay.js` 的**脚本主体**来自 [Community-Scripts](https://github.com/ScriptingApp/Community-Scripts)，版权归原作者，上游当前未附带 LICENSE；MIT 不改变也不主张该部分版权。
+- 原作者如有异议，提 issue 即调整或下线。
+
+---
+
+## English
+
+**TestFlight Relay — Loon build.** A Loon-compatible distribution of the TestFlight relay script from [ScriptingApp/Community-Scripts](https://github.com/ScriptingApp/Community-Scripts) (originally a Surge module).
+
+- `TestFlight-Relay.js` — upstream `module/scripts/TestFlight-Relay.js` plus two Loon compatibility patches
+- `TestFlight-Relay.plugin` — importable Loon plugin
+- Surge users should keep using the upstream `.sgmodule`; this repo is not needed there.
+
+**What it does.** The plugin intercepts TestFlight's requests to `http://tf-relay.test/...` and answers them locally, while also exposing the control API used by the “TestFlight 魔法攻击” Scripting script (`/api/v1/store-accounts`, `/api/v1/control/*`). Account material (cookies, AMD, kbSync) stays in the local Loon persistent store (`tf.accounts` / `tf.apps` / `tf.details` / `tf.tasks`) and is never uploaded anywhere.
+
+**Install.**
+
+1. Disable any other TestFlight Relay plugin first (avoid two matching rules).
+2. Import: `https://cdn.jsdelivr.net/gh/Tempoit/tf-relay-loon@main/TestFlight-Relay.plugin`
+3. Enable it and make sure the script downloaded successfully.
+4. Force-quit TestFlight, then hit “Start TestFlight” again in the script.
+
+Requires Loon **≥ 3.5.1 (983)** (the plugin uses the new Script syntax: `request if ${url} ~= /regex/i then script(...) with ...`).
+
+**Why patches are needed.** Two runtime differences from Surge/QX, both ending in TestFlight showing “TestFlight 不可用 / 网络连接已断开” while the account page still works:
+
+1. *Forwarding branch.* Loon has no `$task`, so the upstream code hands a rewritten request back to the proxy for continuation (`http://tf-relay.test/...` → `https://testflight.apple.com/...`). Surge/QX support that cross-origin + http→https continuation; Loon kills the connection. Patch: `if (!globalThis.$task && !globalThis.$httpClient) return request;` so Loon uses the script-side `$httpClient` fetch instead.
+2. *`this.$request` detection.* In module scope `this` may be empty, so every request is misclassified as a cron run and simply passed through. Patch: check the global `$request` instead (`const hasRequest = typeof $request !== "undefined" && !!$request;`).
+
+Search `[Loon 补丁]` in the script to locate both.
+
+**Self-check endpoints** (no need to launch TestFlight):
+
+| Endpoint | Expected |
+| --- | --- |
+| `/api/v1/store-accounts` | 200 + account list JSON |
+| `/api/v1/control/status` | 200 + recorded client version, e.g. `4.4.1 (697.1)` |
+| `/api/v1/nothing` | 404 + `{"error":{"code":"not_found"}}` |
+| `/v1/appCategories`, `/v4/accounts/<id>/apps` | JSON after patching (previously “connection interrupted”) |
+
+Do not use the root path `http://tf-relay.test/` as a health check — the script has no route for `/` and falls through to the forwarding branch.
+
+**Updating.** Edit `TestFlight-Relay.js` in this repo; the plugin points at `@main`, so no plugin change is needed. jsDelivr caches, so pin `@<commit-sha>` when you need it immediately. When upstream changes, re-apply the two patches (search `$task` / `this.$request`).
+
+**Credits.** Script and protocol work by the [Community-Scripts](https://github.com/ScriptingApp/Community-Scripts) authors; this repo only adds Loon compatibility. See [LICENSE](LICENSE).
+
+**Disclaimer.** For personal study and use only. Relay/multi-account setups may violate Apple's terms of service; you bear the account risk. Never paste cookies, AMD, kbSync, passwords or any credentials into this repo or its issues.
+
